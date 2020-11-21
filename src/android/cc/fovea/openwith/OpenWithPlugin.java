@@ -1,9 +1,15 @@
 package cc.fovea.openwith;
 
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Base64;
 import android.util.Log;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.ArrayList;
 import org.apache.cordova.CallbackContext;
@@ -14,12 +20,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
-* This is the entry point of the openwith plugin
-*
-* @author Jean-Christophe Hoelt
-*/
-public class OpenWithPlugin extends CordovaPlugin {
-
+ * This is the entry point of the openwith plugin
+ *
+ * @author Jean-Christophe Hoelt
+ */
+public class OpenWithPlugin extends CordovaPlugin
+{
     /** How the plugin name shows in logs */
     private final String PLUGIN_NAME = "OpenWithPlugin";
 
@@ -34,32 +40,50 @@ public class OpenWithPlugin extends CordovaPlugin {
 
     /** Current verbosity level, changed with setVerbosity */
     private int verbosity = INFO;
+    /** Callback to the javascript onNewFile method */
+    private CallbackContext handlerContext;
+    /** Callback to the javascript logger method */
+    private CallbackContext loggerContext;
+    /** Intents added before the handler has been registered */
+    private ArrayList pendingIntents = new ArrayList();
+    private Serializer serializer;
+
+    /**
+     * Called after the plugin is initialized
+     */
+    protected void pluginInitialize()
+    {
+        this.serializer = new Serializer(this);
+    }
 
     /** Log to the console if verbosity level is greater or equal to level */
-    private void log(final int level, final String message) {
+    public void log(final int level, final String message)
+    {
         switch(level) {
             case DEBUG: Log.d(PLUGIN_NAME, message); break;
             case INFO: Log.i(PLUGIN_NAME, message); break;
             case WARN: Log.w(PLUGIN_NAME, message); break;
             case ERROR: Log.e(PLUGIN_NAME, message); break;
         }
+
         if (level >= verbosity && loggerContext != null) {
             final PluginResult result = new PluginResult(
                     PluginResult.Status.OK,
-                    String.format("%d:%s", level, message));
+                    String.format("%d:%s", level, message
+            ));
+
             result.setKeepCallback(true);
             loggerContext.sendPluginResult(result);
         }
     }
 
-    /** Callback to the javascript onNewFile method */
-    private CallbackContext handlerContext;
-
-    /** Callback to the javascript logger method */
-    private CallbackContext loggerContext;
-
-    /** Intents added before the handler has been registered */
-    private ArrayList pendingIntents = new ArrayList(); //NOPMD
+    /**
+     * Debug shortcut
+     */
+    public void debug(final String message)
+    {
+        this.log(DEBUG, message);
+    }
 
     /**
      * Called when the WebView does a top-level navigation or refreshes.
@@ -69,7 +93,8 @@ public class OpenWithPlugin extends CordovaPlugin {
      * Does nothing by default.
      */
     @Override
-    public void onReset() {
+    public void onReset()
+    {
         verbosity = INFO;
         handlerContext = null;
         loggerContext = null;
@@ -77,7 +102,7 @@ public class OpenWithPlugin extends CordovaPlugin {
     }
 
     /**
-     * Generic plugin command executor
+     * @inheritdoc
      *
      * @param action
      * @param data
@@ -85,39 +110,46 @@ public class OpenWithPlugin extends CordovaPlugin {
      * @return
      */
     @Override
-    public boolean execute(final String action, final JSONArray data, final CallbackContext callbackContext) {
-        log(DEBUG, "execute() called with action:" + action + " and options: " + data);
+    public boolean execute(final String action, final JSONArray data, final CallbackContext callbackContext)
+    {
+        this.debug("execute: called with action:" + action + " and options: " + data);
+
         if ("setVerbosity".equals(action)) {
             return setVerbosity(data, callbackContext);
         }
-        else if ("init".equals(action)) {
+        if ("init".equals(action)) {
             return init(data, callbackContext);
         }
-        else if ("setHandler".equals(action)) {
+        if ("setHandler".equals(action)) {
             return setHandler(data, callbackContext);
         }
-        else if ("setLogger".equals(action)) {
+        if ("setLogger".equals(action)) {
             return setLogger(data, callbackContext);
         }
-        else if ("load".equals(action)) {
+        if ("load".equals(action)) {
             return load(data, callbackContext);
         }
-        else if ("exit".equals(action)) {
+        if ("exit".equals(action)) {
             return exit(data, callbackContext);
         }
-        log(DEBUG, "execute() did not recognize this action: " + action);
+
+        this.debug("execute: did not recognize this action: " + action);
+
         return false;
     }
 
-    public boolean setVerbosity(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "setVerbosity() " + data);
+    public boolean setVerbosity(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("setVerbosity() " + data);
+
         if (data.length() != 1) {
             log(WARN, "setVerbosity() -> invalidAction");
             return false;
         }
+
         try {
             verbosity = data.getInt(0);
-            log(DEBUG, "setVerbosity() -> ok");
+            this.debug("setVerbosity() -> ok");
             return PluginResultSender.ok(context);
         }
         catch (JSONException ex) {
@@ -127,77 +159,150 @@ public class OpenWithPlugin extends CordovaPlugin {
     }
 
     // Initialize the plugin
-    public boolean init(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "init() " + data);
+    public boolean init(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("[OpenWithPlugin] init: " + data);
+
         if (data.length() != 0) {
-            log(WARN, "init() -> invalidAction");
+            log(WARN, "[OpenWithPlugin] init: invalidAction");
             return false;
         }
+
         onNewIntent(cordova.getActivity().getIntent());
-        log(DEBUG, "init() -> ok");
+
+        this.debug("[OpenWithPlugin] init: ok");
+
         return PluginResultSender.ok(context);
     }
 
     // Exit after processing
-    public boolean exit(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "exit() " + data);
+    public boolean exit(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("exit() " + data);
         if (data.length() != 0) {
             log(WARN, "exit() -> invalidAction");
             return false;
         }
         cordova.getActivity().moveTaskToBack(true);
-        log(DEBUG, "exit() -> ok");
+        this.debug("exit() -> ok");
         return PluginResultSender.ok(context);
     }
 
-    public boolean setHandler(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "setHandler() " + data);
+    public boolean setHandler(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("setHandler() " + data);
         if (data.length() != 0) {
             log(WARN, "setHandler() -> invalidAction");
             return false;
         }
         handlerContext = context;
-        log(DEBUG, "setHandler() -> ok");
+        this.debug("setHandler() -> ok");
         return PluginResultSender.noResult(context, true);
     }
 
-    public boolean setLogger(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "setLogger() " + data);
+    public boolean setLogger(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("setLogger() " + data);
         if (data.length() != 0) {
             log(WARN, "setLogger() -> invalidAction");
             return false;
         }
         loggerContext = context;
-        log(DEBUG, "setLogger() -> ok");
+        this.debug("setLogger() -> ok");
         return PluginResultSender.noResult(context, true);
     }
 
-    public boolean load(final JSONArray data, final CallbackContext context) {
-        log(DEBUG, "load()");
+    /**
+     * Load intent item into a tmp file and return path
+     */
+    public boolean load(final JSONArray data, final CallbackContext context)
+    {
+        this.debug("[OpenWithPlugin] load");
+
         if (data.length() != 1) {
-            log(WARN, "load() -> invalidAction");
+            this.log(WARN, "[OpenWithPlugin] load: invalidAction");
+
             return false;
         }
-        final ContentResolver contentResolver = this.cordova
-            .getActivity().getApplicationContext().getContentResolver();
+
+        /* Execute in thread */
+        OpenWithPlugin plugin = this;
         cordova.getThreadPool().execute(new Runnable() {
             public void run() {
                 try {
                     final JSONObject fileDescriptor = data.getJSONObject(0);
                     final Uri uri = Uri.parse(fileDescriptor.getString("uri"));
-                    final String data = Serializer.getDataFromURI(contentResolver, uri);
+                    final String data = plugin.getTmpPathFromURI(uri);
                     final PluginResult result = new PluginResult(PluginResult.Status.OK, data);
+
+                    plugin.debug("[OpenWithPlugin] load: ok: " + result);
+
                     context.sendPluginResult(result);
-                    log(DEBUG, "load() " + uri + " -> ok");
                 }
-                catch (JSONException e) {
-                    final PluginResult result = new PluginResult(PluginResult.Status.ERROR, e.getMessage());
+                catch (JSONException exc) {
+                    final PluginResult result = new PluginResult(PluginResult.Status.ERROR, exc.getMessage());
+
+                    plugin.debug("[OpenWithPlugin] load: error: " + exc.getMessage());
+
                     context.sendPluginResult(result);
-                    log(DEBUG, "load() -> json error");
                 }
             }
         });
+
         return true;
+    }
+
+    /**
+     * Return a temporary file path
+     */
+    public String getTmpPathFromURI(final Uri uri)
+    {
+        final ContentResolver contentResolver = this.cordova.getActivity().getApplicationContext().getContentResolver();
+
+        this.debug("[OpenWithPlugin] getTmpPathFromURI: uri" + uri.toString());
+
+        try {
+            File outputDir = this.cordova.getActivity().getApplicationContext().getCacheDir();
+            File outputFile = File.createTempFile("openwith", "tmp", outputDir);
+            final InputStream input = contentResolver.openInputStream(uri);
+            final FileOutputStream output = new FileOutputStream(outputFile);
+
+            byte[] buffer = new byte[4 * 1024];
+            int read;
+
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+
+            output.flush();
+
+            this.debug("[OpenWithPlugin] getTmpPathFromURI: success:" + outputFile.getAbsolutePath());
+
+            return outputFile.getAbsolutePath();
+        }
+        catch (IOException exc) {
+            this.debug("[OpenWithPlugin] getTmpPathFromURI: error:" + exc.getMessage());
+
+            return "";
+        }
+    }
+
+    /**
+     * Return data contained at a given Uri as Base64. Defaults to null.
+     */
+    public String getDataFromURI(
+            final ContentResolver contentResolver,
+            final Uri uri
+    ) {
+        try {
+            final InputStream inputStream = contentResolver.openInputStream(uri);
+            final byte[] bytes = ByteStreams.toByteArray(inputStream);
+
+            return Base64.encodeToString(bytes, Base64.NO_WRAP);
+        }
+        catch (IOException e) {
+            return "";
+        }
     }
 
     /**
@@ -208,11 +313,16 @@ public class OpenWithPlugin extends CordovaPlugin {
      */
     @Override
     public void onNewIntent(final Intent intent) {
-        log(DEBUG, "onNewIntent() " + intent.getAction());
+        this.debug("onNewIntent() " + intent.getAction());
+
         final JSONObject json = toJSONObject(intent);
         if (json != null) {
             pendingIntents.add(json);
         }
+        else {
+            this.debug("onNewIntent(): null");
+        }
+
         processPendingIntents();
     }
 
@@ -220,7 +330,8 @@ public class OpenWithPlugin extends CordovaPlugin {
      * When the handler is defined, call it with all attached files.
      */
     private void processPendingIntents() {
-        log(DEBUG, "processPendingIntents()");
+        this.debug("processPendingIntents()");
+
         if (handlerContext == null) {
             return;
         }
@@ -231,8 +342,10 @@ public class OpenWithPlugin extends CordovaPlugin {
     }
 
     /** Calls the javascript intent handlers. */
-    private void sendIntentToJavascript(final JSONObject intent) {
+    private void sendIntentToJavascript(final JSONObject intent)
+    {
         final PluginResult result = new PluginResult(PluginResult.Status.OK, intent);
+
         result.setKeepCallback(true);
         handlerContext.sendPluginResult(result);
     }
@@ -240,16 +353,18 @@ public class OpenWithPlugin extends CordovaPlugin {
     /**
      * Converts an intent to JSON
      */
-    private JSONObject toJSONObject(final Intent intent) {
+    private JSONObject toJSONObject(final Intent intent)
+    {
+        debug("toJSONObject");
+
         try {
-            final ContentResolver contentResolver = this.cordova
-                .getActivity().getApplicationContext().getContentResolver();
-            return Serializer.toJSONObject(contentResolver, intent);
-        } catch (JSONException e) {
+            return this.serializer.toJSONObject(intent);
+        }
+        catch (JSONException e) {
             log(ERROR, "Error converting intent to JSON: " + e.getMessage());
             log(ERROR, Arrays.toString(e.getStackTrace()));
+
             return null;
         }
     }
 }
-// vim: ts=4:sw=4:et
