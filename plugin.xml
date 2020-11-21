@@ -46,30 +46,82 @@ SOFTWARE.
         </js-module>
 
         <config-file target="AndroidManifest.xml" parent="/manifest/application/activity">
+            <!--
+                .book is registered in java mimetypes as "application/x-maker"
+                @see https://github.com/boaglio/java-enum-mimetype/blob/master/MimeType.java#L39
+                If this changes, just add back this wildcard and then check in the
+                Plugin what is the new inferred mime type
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/book+zip" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="*/*" />
             </intent-filter>
+            -->
+
+            <!-- Known mime types: book, pdf, epub -->
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/x-maker"
+                    android:pathPattern=".*\\.book" />
+                <!-- It seems (after testing) that unknown mime-types
+                     are generated from extensions, like this one -->
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/omnibook"
+                    android:pathPattern=".*\\.omnibook" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/epub+zip"
+                    android:pathPattern=".*\\.epub" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/pdf"
+                    android:pathPattern=".*\\.pdf" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/octet-stream"
+                    android:pathPattern=".*\\.book" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/octet-stream"
+                    android:pathPattern=".*\\.omnibook" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/octet-stream"
+                    android:pathPattern=".*\\.epub" />
+                <data
+                    android:scheme="content"
+                    android:mimeType="application/octet-stream"
+                    android:pathPattern=".*\\.pdf" />
+
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/epub+zip" />
+                <category android:name="android.intent.category.BROWSABLE" />
             </intent-filter>
+
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
+                <data android:scheme="file"
+                      android:mimeType="*/*"
+                      android:pathPattern=".*\\.book"
+                      android:host="*"/>
+                <data android:scheme="file"
+                      android:mimeType="*/*"
+                      android:pathPattern=".*\\.omnibook"
+                      android:host="*"/>
+                <data android:scheme="file"
+                      android:mimeType="*/*"
+                      android:pathPattern=".*\\.epub"
+                      android:host="*"/>
+                <data android:scheme="file"
+                      android:mimeType="*/*"
+                      android:pathPattern=".*\\.pdf"
+                      android:host="*"/>
+
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/zip" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="application/octet-stream" />
+                <category android:name="android.intent.category.BROWSABLE" />
             </intent-filter>
         </config-file>
 
