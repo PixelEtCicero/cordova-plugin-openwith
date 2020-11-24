@@ -1,6 +1,6 @@
 /* global describe it beforeEach */
-var openwith = require('./openwith')
-var expect = require('expect.js')
+var openwith = require('./openwith');
+var expect = require('expect.js');
 
 describe('openwith', () => {
   var cordovaExecArgs

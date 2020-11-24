@@ -28,25 +28,18 @@ public class OpenWithPlugin extends CordovaPlugin
 {
     /** How the plugin name shows in logs */
     private final String PLUGIN_NAME = "OpenWithPlugin";
-
-    /** Maximal verbosity, log everything */
-    private final int DEBUG = 0;
-    /** Default verbosity, log interesting stuff only */
-    private final int INFO = 10;
-    /** Low verbosity, log only warnings and errors  */
-    private final int WARN = 20;
-    /** Minimal verbosity, log only errors */
-    private final int ERROR = 30;
-
-    /** Current verbosity level, changed with setVerbosity */
-    private int verbosity = INFO;
     /** Callback to the javascript onNewFile method */
     private CallbackContext handlerContext;
-    /** Callback to the javascript logger method */
-    private CallbackContext loggerContext;
     /** Intents added before the handler has been registered */
     private ArrayList pendingIntents = new ArrayList();
     private Serializer serializer;
+    /**
+     * 0: error
+     * 1: warn
+     * 2: info
+     * 3: debug
+     */
+    private int VERBOSITY = 3;
 
     /**
      * Called after the plugin is initialized
@@ -56,33 +49,42 @@ public class OpenWithPlugin extends CordovaPlugin
         this.serializer = new Serializer(this);
     }
 
-    /** Log to the console if verbosity level is greater or equal to level */
-    public void log(final int level, final String message)
-    {
-        switch(level) {
-            case DEBUG: Log.d(PLUGIN_NAME, message); break;
-            case INFO: Log.i(PLUGIN_NAME, message); break;
-            case WARN: Log.w(PLUGIN_NAME, message); break;
-            case ERROR: Log.e(PLUGIN_NAME, message); break;
-        }
-
-        if (level >= verbosity && loggerContext != null) {
-            final PluginResult result = new PluginResult(
-                    PluginResult.Status.OK,
-                    String.format("%d:%s", level, message
-            ));
-
-            result.setKeepCallback(true);
-            loggerContext.sendPluginResult(result);
-        }
-    }
-
     /**
      * Debug shortcut
      */
     public void debug(final String message)
     {
-        this.log(DEBUG, message);
+        if (this.VERBOSITY > 2) {
+            Log.d(PLUGIN_NAME, message);
+        }
+    }
+
+    /**
+     * Info shortcut
+     */
+    public void info(final String message)
+    {
+        if (this.VERBOSITY > 1) {
+            Log.i(PLUGIN_NAME, message);
+        }
+    }
+
+    /**
+     * Warn shortcut
+     */
+    public void warn(final String message)
+    {
+        if (this.VERBOSITY > 0) {
+            Log.w(PLUGIN_NAME, message);
+        }
+    }
+
+    /**
+     * Error shortcut
+     */
+    public void error(final String message)
+    {
+        Log.e(PLUGIN_NAME, message);
     }
 
     /**
@@ -95,9 +97,7 @@ public class OpenWithPlugin extends CordovaPlugin
     @Override
     public void onReset()
     {
-        verbosity = INFO;
         handlerContext = null;
-        loggerContext = null;
         pendingIntents.clear();
     }
 
@@ -114,17 +114,11 @@ public class OpenWithPlugin extends CordovaPlugin
     {
         this.debug("execute: called with action:" + action + " and options: " + data);
 
-        if ("setVerbosity".equals(action)) {
-            return setVerbosity(data, callbackContext);
-        }
         if ("init".equals(action)) {
             return init(data, callbackContext);
         }
         if ("setHandler".equals(action)) {
             return setHandler(data, callbackContext);
-        }
-        if ("setLogger".equals(action)) {
-            return setLogger(data, callbackContext);
         }
         if ("load".equals(action)) {
             return load(data, callbackContext);
@@ -138,33 +132,14 @@ public class OpenWithPlugin extends CordovaPlugin
         return false;
     }
 
-    public boolean setVerbosity(final JSONArray data, final CallbackContext context)
-    {
-        this.debug("setVerbosity() " + data);
-
-        if (data.length() != 1) {
-            log(WARN, "setVerbosity() -> invalidAction");
-            return false;
-        }
-
-        try {
-            verbosity = data.getInt(0);
-            this.debug("setVerbosity() -> ok");
-            return PluginResultSender.ok(context);
-        }
-        catch (JSONException ex) {
-            log(WARN, "setVerbosity() -> invalidAction");
-            return false;
-        }
-    }
-
     // Initialize the plugin
     public boolean init(final JSONArray data, final CallbackContext context)
     {
         this.debug("[OpenWithPlugin] init: " + data);
 
         if (data.length() != 0) {
-            log(WARN, "[OpenWithPlugin] init: invalidAction");
+            this.warn("[OpenWithPlugin] init: invalidAction");
+
             return false;
         }
 
@@ -178,37 +153,35 @@ public class OpenWithPlugin extends CordovaPlugin
     // Exit after processing
     public boolean exit(final JSONArray data, final CallbackContext context)
     {
-        this.debug("exit() " + data);
+        this.debug("[OpenWithPlugin] exit: " + data);
+
         if (data.length() != 0) {
-            log(WARN, "exit() -> invalidAction");
+            this.warn("[OpenWithPlugin] exit: invalidAction");
+
             return false;
         }
+
         cordova.getActivity().moveTaskToBack(true);
-        this.debug("exit() -> ok");
+
+        this.debug("[OpenWithPlugin] exit: ok");
+
         return PluginResultSender.ok(context);
     }
 
     public boolean setHandler(final JSONArray data, final CallbackContext context)
     {
-        this.debug("setHandler() " + data);
-        if (data.length() != 0) {
-            log(WARN, "setHandler() -> invalidAction");
-            return false;
-        }
-        handlerContext = context;
-        this.debug("setHandler() -> ok");
-        return PluginResultSender.noResult(context, true);
-    }
+        this.debug("[OpenWithPlugin] setHandler: " + data);
 
-    public boolean setLogger(final JSONArray data, final CallbackContext context)
-    {
-        this.debug("setLogger() " + data);
         if (data.length() != 0) {
-            log(WARN, "setLogger() -> invalidAction");
+            this.warn("[OpenWithPlugin] invalidAction");
+
             return false;
         }
-        loggerContext = context;
-        this.debug("setLogger() -> ok");
+
+        handlerContext = context;
+
+        this.debug("[OpenWithPlugin] setHandler: ok");
+
         return PluginResultSender.noResult(context, true);
     }
 
@@ -220,7 +193,7 @@ public class OpenWithPlugin extends CordovaPlugin
         this.debug("[OpenWithPlugin] load");
 
         if (data.length() != 1) {
-            this.log(WARN, "[OpenWithPlugin] load: invalidAction");
+            this.warn("[OpenWithPlugin] load: invalidAction");
 
             return false;
         }
@@ -355,14 +328,14 @@ public class OpenWithPlugin extends CordovaPlugin
      */
     private JSONObject toJSONObject(final Intent intent)
     {
-        debug("toJSONObject");
+        this.debug("toJSONObject");
 
         try {
             return this.serializer.toJSONObject(intent);
         }
         catch (JSONException e) {
-            log(ERROR, "Error converting intent to JSON: " + e.getMessage());
-            log(ERROR, Arrays.toString(e.getStackTrace()));
+            this.error("Error converting intent to JSON: " + e.getMessage());
+            this.error(Arrays.toString(e.getStackTrace()));
 
             return null;
         }

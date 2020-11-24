@@ -7,11 +7,11 @@ import org.apache.cordova.PluginResult;
  * Helper methods to reduce the pain while calling javascript callbacks.
  */
 @SuppressWarnings("PMD.ShortMethodName")
-class PluginResultSender {
-
+class PluginResultSender
+{
     /** Send an INVALID_ACTION error. */
-    public static boolean invalidAction(
-            final CallbackContext context) {
+    public static boolean invalidAction(final CallbackContext context)
+    {
         final PluginResult result = new PluginResult(PluginResult.Status.INVALID_ACTION);
         context.sendPluginResult(result);
         return false;
@@ -22,7 +22,8 @@ class PluginResultSender {
      * an option to this method. */
     public static boolean noResult(
             final CallbackContext context,
-            final boolean keepCallback) {
+            final boolean keepCallback
+    ) {
         final PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
         result.setKeepCallback(keepCallback);
         context.sendPluginResult(result);
@@ -31,10 +32,10 @@ class PluginResultSender {
 
     /** Send OK. */
     public static boolean ok(
-            final CallbackContext context) {
+            final CallbackContext context
+    ) {
         final PluginResult result = new PluginResult(PluginResult.Status.OK);
         context.sendPluginResult(result);
         return true;
     }
 }
-// vim: ts=4:sw=4:et
